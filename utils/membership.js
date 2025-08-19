@@ -1,33 +1,16 @@
-// membership.js
- // Handles user membership checks and user data storage
 
-async function userIsMember(bot, userId, chatId) {
-  try {
-    const me = await bot.getMe();
-    const botMember = await bot.getChatMember(chatId, me.id);
-
-    const isBotAdmin = ["administrator", "creator"].includes(botMember.status);
-    if (!isBotAdmin) {
-      logger.warn(`❌ Bot is NOT admin in ${chatId}`);
-      return { joined: false, botAdmin: false };
-    }
-
-    const member = await bot.getChatMember(chatId, userId);
-    const joinedStatuses = ["member", "administrator", "creator"];
-    const joined = joinedStatuses.includes(member.status);
-
-    logger.info(`👤 User ${userId} in ${chatId}: ${joined ? "JOINED" : "NOT JOINED"}`);
-    return { joined, botAdmin: true };
-
-  } catch (err) {
-    logger.error(`Error checking membership in ${chatId}: ${err.message}`);
-    return { joined: false, botAdmin: false };
-  }
-}
-
-const { BOT_ADMINS, ADMIN_IDS, requiredChannels } = require("../config/bot-config");
-const logger = require("../utils/logger");
+const logger = require("./logger");
 const { saveData } = require("../utils/data-store");
+
+// Required channels configuration
+const requiredChannels = [
+  { id: "@Jk_Bots", name: "Jk Bots", SCname: "ᴊᴋ ʙᴏᴛs"},
+  { id: "@G1me0n", name: "Game ON !", SCname: "ɢᴀᴍᴇ ᴏɴ !"},
+  { id: "@FreeGameSOne", name: "Free GameS", SCname: "ғʀᴇᴇ ɢᴀᴍᴇs"}
+];
+
+// Bot admins
+const BOT_ADMINS = [1154246588, 987654321];
 
 /**
  * ɢᴇᴛs ᴜsᴇʀ ᴀɴᴅ ʙᴏᴛ ᴍᴇᴍʙᴇʀsʜɪᴘ sᴛᴀᴛᴜs ғᴏʀ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs.
@@ -105,14 +88,18 @@ async function sendJoinReminder(bot, chatId, missingUserChats) {
 
   return bot.sendMessage(
     chatId,
-    `<blockquote>❌ ʏᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs</blockquote>\n\n<b>ᴍɪssɪɴɢ:</b>\n<blockquote><b>${missingList}</b></blockquote>\n\n<blockquote>ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇᴍ ꜰɪʀsᴛ ᴀɴᴅ ᴛʀʏ ᴀɢᴀɪɴ</blockquote>`,
-    { parse_mode: "HTML", reply_markup: { inline_keyboard: joinButtons } }
-  );
+    `<blockquote>❌ ʏᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs</blockquote>\n\n<b>ᴍɪssɪɴɢ:</b>\n<blockquote><b>${missingList}</b></blockquote>\n\n<blockquote>ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇᴍ ғɪʀsᴛ ᴀɴᴅ ᴛʀʏ ᴀɢᴀɪɴ</blockquote>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: joinButtons }
+    }
+  ).catch(err => logger.error('Error sending join reminder:', err));
 }
 
-module.exports = { 
-  userIsMember,
-  getMembershipStatus, 
-  notifyBotAdmins, 
-  sendJoinReminder 
+module.exports = {
+  getMembershipStatus,
+  notifyBotAdmins,
+  sendJoinReminder,
+  requiredChannels,
+  BOT_ADMINS
 };
