@@ -1,0 +1,21 @@
+{
+  "CHECKED": {
+    "users": [
+      1154246588,
+      1999668659
+    ]
+  },
+  "NOT_CHECKED": {
+    "users": []
+  },
+  "WELCOME_MESSAGES": {
+    "1154246588": {
+      "chatId": 1154246588,
+      "messageId": 602
+    },
+    "1999668659": {
+      "chatId": 1999668659,
+      "messageId": 593
+    }
+  }
+}
