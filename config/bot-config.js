@@ -1,3 +1,4 @@
+
 /**
  * Bot Configuration Module
  * Handles all bot-related configuration settings
@@ -89,7 +90,7 @@ class BotConfig {
                     [{ text: '✨ ɢᴇɴᴇʀᴀᴛᴇ ✨', callback_data: 'menu_search' }],
                     [
                         { text: '🎧 ᴍᴜsɪᴄ', callback_data: 'menu_music' },
-                        { text: 'sᴇᴛᴛɪɴɢs ⚙️', callback_data: '/menu_settings' }
+                        { text: 'sᴇᴛᴛɪɴɢs ⚙️', callback_data: 'menu_settings' }
                     ],
                     [{ text: '➕ ᴀᴅᴅ ᴍᴇ ➕', url: `https://t.me/${this.id}?startgroup=true` }]
                 ]
