@@ -17,7 +17,6 @@ if (!BOT_TOKEN) {
 // Bot configuration
 const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
-const PORT = process.env.PORT || 8000;
 
 let bot;
 
@@ -67,6 +66,33 @@ bot.on('polling_error', (error) => {
             }
         }, 5000);
     }
+});
+
+// Create Express server for Railway deployment (even in polling mode)
+
+const app = express();
+const PORT = process.env.PORT || 8000;
+
+// Health check endpoint for Railway
+app.get('/', (req, res) => {
+    res.json({ 
+        status: 'Bot is running',
+        mode: USE_WEBHOOK ? 'webhook' : 'polling',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        bot: 'online',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Start Express server
+app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Health server running on port ${PORT}`);
 });
 
 // Graceful shutdown
