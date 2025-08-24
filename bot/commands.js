@@ -1,372 +1,315 @@
-// commands.js
-// Handles all bot commands and interactions
+/**
+ * Menu Commands Module (Refactored + Pagination, Fixed Callback Handling)
+ */
+const musicService = require('../services/music-service');
+const playlistService = require('../services/playlist-service');
+const logger = require('../utils/logger');
+const botConfig = require('../config/bot-config');
 
-const fs = require("fs");
-const path = require("path");
-const logger = require("../utils/logger");
-const botConfig = require("../config/bot-config");
-const { setupMusicCommands } = require("./music-commands");
-const { setupMenuCommands, handleCallback: handleMenuCallback } = require("./menu-commands");
-const { loadData, saveData } = require("../utils/data-store");
-
-// Admin IDs
-const ADMIN_IDS = [1154246588, 987654321];
-const BOT_ADMINS = ADMIN_IDS;
-
-let dataStore = loadData();
-
-// Ensure the dataStore has proper structure
-if (!dataStore.CHECKED) dataStore.CHECKED = { users: [] };
-if (!dataStore.NOT_CHECKED) dataStore.NOT_CHECKED = { users: [] };
-
-const requiredChannels = [
-  { id: "@Jk_Bots", name: "Jk Bots", SCname: "ᴊᴋ ʙᴏᴛs" },
-  { id: "@G1me0n", name: "Game ON !", SCname: "ɢᴀᴍᴇ ᴏɴ !" },
-  { id: "@FreeGameSOne", name: "Free GameS", SCname: "ғʀᴇᴇ ɢᴀᴍᴇs" },
-];
-
-// --- HELPER: edit message safely whether it's photo+caption or text ---
-async function safeEdit(bot, message, newText, keyboard) {
-  const opts = {
-    chat_id: message.chat.id,
-    message_id: message.message_id,
-    reply_markup: keyboard,
-    parse_mode: "HTML"
-  };
-
-  try {
-    if (message.caption !== undefined) {
-      // Message is a photo/media with caption
-      await bot.editMessageCaption(newText, opts);
-    } else {
-      // Message is a normal text message
-      await bot.editMessageText(newText, opts);
+// --- MEDIA CONFIGURATION ---
+const menuMedia = {
+    menu_music: {
+        type: "photo",
+        media: "https://t.me/Jkey_GameST/4592",
+        caption: "" // Will be set dynamically
+    },
+    menu_settings: {
+        type: "photo", 
+        media: "https://t.me/Jkey_GameST/4593",
+        caption: "" // Will be set dynamically
     }
-  } catch (err) {
-    console.error("safeEdit error:", err.message);
-  }
+};
+
+// --- HELPERS ---
+function escapeHTML(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;');
 }
 
-// HELPER: Check if user is member and bot has admin rights in chat
-async function checkMembershipAndBotAdmin(bot, userId, chatId) {
-  try {
-    const chatMember = await bot.getChatMember(chatId, userId);
-    const joined = ["member", "administrator", "creator"].includes(chatMember.status);
-
-    const botUser = await bot.getMe();
-    const botMember = await bot.getChatMember(chatId, botUser.id);
-    const botAdmin = ["administrator", "creator"].includes(botMember.status);
-
-    return { joined, botAdmin };
-  } catch (err) {
-    console.error(`Error checking membership or bot admin in ${chatId}:`, err);
-    return { joined: false, botAdmin: false };
-  }
+function safeHTML(text) {
+    return text.replace(/<(?!\/?(b|i|code|blockquote)>)/g, '');
 }
 
-function setupCommands(bot) {
-  // /start command
-  bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-
-    let allJoined = true;
-    for (const ch of requiredChannels) {
-      const { joined } = await checkMembershipAndBotAdmin(bot, userId, ch.id);
-      if (!joined) {
-        allJoined = false;
-        break;
-      }
-    }
-
-    if (allJoined) {
-      if (!dataStore.CHECKED.users.includes(userId)) {
-        dataStore.CHECKED.users.push(userId);
-        saveData(dataStore);
-      }
-
-      const welcome = botConfig.getWelcomeMessage(msg.from.first_name || "User");
-      try {
-        const sentMsg = await bot.sendPhoto(chatId, "https://t.me/Jkey_GameST/4587", {
-          caption: welcome.text,
-          parse_mode: "HTML",
-          reply_markup: welcome.keyboard,
-        });
-        if (!dataStore.WELCOME_MESSAGES) dataStore.WELCOME_MESSAGES = {};
-        dataStore.WELCOME_MESSAGES[userId] = { chatId, messageId: sentMsg.message_id };
-        saveData(dataStore);
-      } catch (err) {
-        console.error("Error sending welcome photo on /start:", err);
-        try {
-          const sentMsg = await bot.sendMessage(chatId, welcome.text, {
-            parse_mode: "HTML",
-            reply_markup: welcome.keyboard,
-          });
-          if (!dataStore.WELCOME_MESSAGES) dataStore.WELCOME_MESSAGES = {};
-          dataStore.WELCOME_MESSAGES[userId] = { chatId, messageId: sentMsg.message_id };
-          saveData(dataStore);
-        } catch (err2) {
-          console.error("Error sending welcome text fallback on /start:", err2);
+// --- MENU DEFINITIONS ---
+const menus = {
+    menu_music: {
+        baseText: '<blockquote><b>ᴍᴇɴᴜ ᴍᴜsɪᴄ 🎧</b></blockquote>\n\n<blockquote>ᴛʜɪs ɪs ᴛʜᴇ ᴍᴜsɪᴄ ᴍᴇɴᴜ. ʜᴇʀᴇ ʏᴏᴜ ᴄᴀɴ ᴘʟᴀʏ, sᴛᴏᴘ, ɴᴇxᴛ, ᴘʀᴇᴠɪᴏᴜs ᴀɴᴅ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴘʟᴀʏʟɪsᴛ</blockquote>',
+        keyboard: {
+            inline_keyboard: [
+                [{ text: '▶️ ᴘʟᴀʏ', callback_data: 'music_play' }, { text: '⏸ sᴛᴏᴘ', callback_data: 'music_stop' }],
+                [{ text: '⏭ ɴᴇxᴛ', callback_data: 'music_next' }, { text: '⏮ ᴘʀᴇᴠɪᴏᴜs', callback_data: 'music_previous' }],
+                [{ text: '📂 ᴘʟᴀʏʟɪsᴛs', callback_data: 'menu_playlists' }],
+                [{ text: '🎵 qᴜɪᴄᴋ ᴘʟᴀʏ', callback_data: 'quick_play' }],
+                [{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]
+            ]
         }
-      }
-    } else {
-      const joinMessage = `<blockquote><b>🔒 ʙᴏᴛ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ʟᴏᴄᴋᴇᴅ 🔒</b></blockquote>
+    },
+    menu_settings: {
+        text: `<blockquote><b>⚙️ ᴍᴇɴᴜ ꜱᴇᴛᴛɪɴɢꜱ ✦</b></blockquote>
 
-<blockquote>ᴛᴏ ᴜɴʟᴏᴄᴋ ɪᴛ, ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟs ᴀɴᴅ ɢʀᴏᴜᴘs ʟɪsᴛᴇᴅ ʙᴇʟᴏᴡ ᴛᴏ sᴛᴀʏ ᴜᴘᴅᴀᴛᴇᴅ 🍃</blockquote>  
-<blockquote>ᴏɴᴄᴇ ʏᴏᴜ’ᴠᴇ ᴊᴏɪɴᴇᴅ, ᴄʟɪᴄᴋ ᴛʜᴇ  
-<b>» ᴄʜᴇᴄᴋ «</b> ʙᴜᴛᴛᴏɴ</blockquote>`;
+<blockquote>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ʏᴏᴜʀ ᴄᴏɴᴛʀᴏʟ ᴄᴇɴᴛᴇʀ
+ʜᴇʀᴇ ʏᴏᴜ ᴄᴀɴ ᴛᴜɴᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ, ᴀᴄᴄᴇꜱꜱ ʜᴇʟᴘ, ᴜᴛɪʟɪᴛɪᴇꜱ, ᴘʀᴇᴍɪᴜᴍ ᴘʟᴀɴꜱ, ʙᴏᴛ ɪɴꜰᴏ, ᴄʜᴀᴛ ꜱᴇᴛᴛɪɴɢꜱ & ᴍᴏʀᴇ</blockquote>
 
-      const joinButtons = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "ᴊᴏɪɴ ᴀʟʟ", url: "https://t.me/addlist/osaw0pq3BbBjN2Y8" }],
-            [
-              { text: "ᴊᴏɪɴ", url: "https://t.me/Jk_Bots" },
-              { text: "ᴊᴏɪɴ", url: "https://t.me/FreeGameSOne" },
-            ],
-            [{ text: "⟳ ᴄʜᴇᴄᴋ ⟲", callback_data: "/check_membership" }],
-          ],
-        },
-      };
-
-      try {
-        await bot.sendPhoto(chatId, "https://t.me/Jkey_GameST/4588", {
-          caption: joinMessage,
-          parse_mode: "HTML",
-          reply_markup: joinButtons.reply_markup,
-        });
-      } catch (err) {
-        console.error("Error sending join message on /start:", err);
-      }
-    }
-  });
-
-  // Callback for membership check and menus
-  bot.on("callback_query", async (callbackQuery) => {
-    const { data, message, from, id: callbackId } = callbackQuery;
-
-    try {
-      // --- Membership check ---
-      if (data === "/check_membership") {
-        await bot.answerCallbackQuery(callbackId, {
-          text: "🔄 ᴄʜᴇᴄᴋɪɴɢ ᴍᴇᴍʙᴇʀsʜɪᴘ...",
-        });
-
-        const userId = from.id;
-        const missingChats = [];
-
-        for (const ch of requiredChannels) {
-          const { joined } = await checkMembershipAndBotAdmin(bot, userId, ch.id);
-          if (!joined) missingChats.push(ch);
+<blockquote>🔧 ᴄᴜꜱᴛᴏᴍɪᴢᴇ ʏᴏᴜʀ ꜱᴛʏʟᴇ  
+🧠 ᴜɴʟᴏᴄᴋ ᴛᴏᴏʟꜱ  
+🎵 ᴋᴇᴇᴘ ᴛʜᴇ ʙᴇᴀᴛꜱ ꜰʟᴏᴡɪɴɢ</blockquote>`,
+        keyboard: {
+            inline_keyboard: [
+                [{ text: '📜 ʜᴇʟᴘ', callback_data: 'quick_help' }, { text: '🛠 ᴜᴛɪʟɪᴛʏ', callback_data: 'menu_utility' }],
+                [{ text: '💳 ᴘʟᴀɴs', callback_data: 'menu_plans' }, { text: 'ℹ️ ʙᴏᴛ ɪɴғᴏ', callback_data: 'menu_info' }],
+                [{ text: '👑 ᴏᴡɴᴇʀ', url: 'https://t.me/Jkey_GameS' }, { text: '💬 ᴄʜᴀᴛ', callback_data: 'menu_chat' }],
+                [{ text: '🌍 ʟᴀɴɢᴜᴀɢᴇ', callback_data: 'menu_language' }, { text: '📊 sᴛᴀᴛs', callback_data: 'menu_stats' }],
+                [{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]
+            ]
         }
+    }
+};
 
-        if (missingChats.length === 0) {
-          if (!dataStore.CHECKED.users.includes(userId)) {
-            dataStore.CHECKED.users.push(userId);
-            saveData(dataStore);
-          }
-
-          const welcome = botConfig.getWelcomeMessage(from.first_name || "User");
-
-          try {
-            // ✅ send a new message instead of editing
-await bot.editMessageMedia(
-  {
-    type: "photo",
-    media: "https://t.me/Jkey_GameST/4587",
-    caption: welcome.text,
-    parse_mode: "HTML",
-  },
-  {
-    chat_id: message.chat.id,
-    message_id: message.message_id,
-    reply_markup: welcome.keyboard, // <-- use the keyboard object directly
-  }
-);
-            if (!dataStore.WELCOME_MESSAGES) dataStore.WELCOME_MESSAGES = {};
-            dataStore.WELCOME_MESSAGES[userId] = { chatId: message.chat.id, messageId: sentMsg.message_id };
-            saveData(dataStore);
-          } catch (err) {
-            console.error("Error sending welcome message after check:", err);
-          }
-
-          await bot.answerCallbackQuery(callbackId, { text: "✅ ᴄʜᴇᴄᴋ ᴘᴀssᴇᴅ" });
+// --- SEND / EDIT WRAPPER (UPDATED FOR MEDIA) ---
+async function sendOrEdit(bot, chatId, msgId, text, keyboard, parseMode = 'HTML', menuType = null) {
+    const options = { parse_mode: parseMode, reply_markup: keyboard };
+    
+    // If we have a menu type with media, handle media editing/sending
+    if (menuType && menuMedia[menuType]) {
+        const mediaConfig = { ...menuMedia[menuType] };
+        mediaConfig.caption = text;
+        mediaConfig.parse_mode = parseMode;
+        
+        if (msgId) {
+            // Edit existing media message
+            try {
+                return await bot.editMessageMedia(mediaConfig, {
+                    chat_id: chatId,
+                    message_id: msgId,
+                    reply_markup: keyboard
+                });
+            } catch (err) {
+                const desc = err.response?.body?.description;
+                if (desc?.includes('message is not modified')) {
+                    logger.info(`Media message already up-to-date (chat: ${chatId})`);
+                } else if (desc?.includes('no text in the message to edit') || 
+                          desc?.includes('message to edit not found')) {
+                    // Fallback to sending new media message
+                    logger.info(`Cannot edit message (chat: ${chatId}), sending new media`);
+                    return await bot.sendPhoto(chatId, mediaConfig.media, {
+                        caption: text,
+                        parse_mode: parseMode,
+                        reply_markup: keyboard
+                    });
+                } else {
+                    logger.error(`Error editing media message (chat: ${chatId}):`, err);
+                    throw err;
+                }
+            }
         } else {
-          await bot.answerCallbackQuery(callbackId, { text: "❌ ɴᴏᴛ ᴊᴏɪɴᴇᴅ" });
-
-          const missingList = missingChats.map((c) => `• ${c.SCname}`).join("\n");
-          const joinButtons = missingChats.map((c) => [
-            { text: `ᴊᴏɪɴ ${c.SCname}`, url: `https://t.me/${c.id.replace("@", "")}` },
-          ]);
-          joinButtons.push([{ text: "⟳ ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ ⟲", callback_data: "/check_membership" }]);
-
-          try {
-await bot.editMessageMedia(
-  {
-    type: "photo",
-    media: "https://t.me/Jkey_GameST/4589",
-    caption: `<blockquote>❌ ʏᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs</blockquote>\n\n<b>ᴍɪssɪɴɢ:</b>\n<blockquote><b>${missingList}</b></blockquote>\n\n<blockquote>ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇᴍ ғɪʀsᴛ ᴀɴᴅ ᴛʀʏ ᴀɢᴀɪɴ</blockquote>`,
-    parse_mode: "HTML",
-  },
-  {
-    chat_id: message.chat.id,
-    message_id: message.message_id,
-    reply_markup: { inline_keyboard: joinButtons },
-  });
-                 } catch (err) {
-     console.error("Error sending join reminder message:", err);
-          }
+            // Send new media message
+            return await bot.sendPhoto(chatId, mediaConfig.media, {
+                caption: text,
+                parse_mode: parseMode,
+                reply_markup: keyboard
+            });
         }
-        return;
-      }
-
-      // --- Menu buttons (safe edit for text or photo) ---
-      if (data.startsWith("menu_") || data.startsWith("music_") || data.startsWith("quick_") || data.startsWith("utility_")) {
-        const userId = from.id;
-        const chatId = message.chat.id;
-
-        console.log(`[CALLBACK] User ${from.first_name} (${userId}) clicked: ${data}`);
-
-        const { text, keyboard } = (await handleMenuCallback(bot, chatId, data, callbackQuery)) || {};
-        if (text && keyboard) {
-          await safeEdit(bot, message, text, keyboard);
-        }
-
-        await bot.answerCallbackQuery(callbackId);
-        return;
-      }
-    } catch (error) {
-      console.error("Error in callback query handler:", error);
-      await bot
-        .answerCallbackQuery(callbackId, { text: "❌ An error occurred" })
-        .catch((err) => console.error("Error answering error callback:", err));
     }
-  });
-  // --- END CALLBACK QUERY HANDLER ---
-
-  // /stats command
-  bot.onText(/\/stats/, (msg) => {
-    if (!ADMIN_IDS.includes(msg.from.id)) {
-      return bot.sendMessage(msg.chat.id, "🚫 You are not authorized to use this command.");
-    }
-    const checkedCount = dataStore.CHECKED.users.length;
-    const notCheckedCount = dataStore.NOT_CHECKED.users.length;
-    const statsMessage = `
-📊 <b>Bot Stats</b>
-✅ Joined: ${checkedCount}
-❌ Not joined: ${notCheckedCount}
-
-<b>✅ Joined IDs:</b>
-<code>${dataStore.CHECKED.users.join(", ") || "None"}</code>
-
-<b>❌ Not joined IDs:</b>
-<code>${dataStore.NOT_CHECKED.users.join(", ") || "None"}</code>
-`;
-    bot.sendMessage(msg.chat.id, statsMessage, { parse_mode: "HTML" });
-  });
-
-  // /help
-  bot.onText(/\/help/, (msg) => {
-    bot
-      .sendMessage(msg.chat.id, botConfig.getHelpMessage())
-      .catch((err) => console.error("Error sending help message:", err));
-  });
-
-  // /ping
-  bot.onText(/\/ping/, (msg) => {
-    bot
-      .sendMessage(msg.chat.id, "🏓 Pong! Bot is online and responding.")
-      .catch((err) => console.error("Error sending ping response:", err));
-  });
-
-  // /echo
-  bot.onText(/\/echo (.+)/, (msg, match) => {
-    const chatId = msg.chat.id;
-    const textToEcho = match[1].trim();
-    if (textToEcho) {
-      const maxLength = botConfig.getMaxEchoLength();
-      const echoText =
-        textToEcho.length > maxLength ? textToEcho.substring(0, maxLength) + "..." : textToEcho;
-      bot
-        .sendMessage(chatId, `🔄 Echo: ${echoText}`)
-        .catch((err) => console.error("Error sending echo message:", err));
+    
+    // Fallback to text message editing/sending
+    if (msgId) {
+        return bot.editMessageText(text, { ...options, chat_id: chatId, message_id: msgId }).catch(err => {
+            const desc = err.response?.body?.description;
+            if (desc?.includes('message is not modified')) {
+                logger.info(`Message already up-to-date (chat: ${chatId})`);
+            } else if (desc?.includes('parse entities')) {
+                return bot.editMessageText(safeHTML(text), {
+                    chat_id: chatId,
+                    message_id: msgId,
+                    reply_markup: keyboard
+                }).catch(fallbackErr => logger.error('Error with fallback edit:', fallbackErr));
+            } else if (desc?.includes('no text in the message to edit')) {
+                logger.info(`Cannot edit media message (chat: ${chatId}), sending new one`);
+                return bot.sendMessage(chatId, text, options).catch(sendErr =>
+                    logger.error('Error sending new message:', sendErr));
+            } else {
+                logger.error(`Error editing message (chat: ${chatId}):`, err);
+            }
+        });
     } else {
-      bot
-        .sendMessage(msg.chat.id, "❌ Please provide text to echo. Usage: /echo <your text>")
-        .catch((err) => console.error("Error sending echo usage message:", err));
+        return bot.sendMessage(chatId, text, options).catch(err => {
+            const desc = err.response?.body?.description;
+            if (desc?.includes('parse entities')) {
+                return bot.sendMessage(chatId, safeHTML(text), { reply_markup: keyboard })
+                    .catch(fallbackErr => logger.error('Error with fallback send:', fallbackErr));
+            }
+            logger.error(`Error sending message (chat: ${chatId}):`, err);
+        });
     }
-  });
-
-  // /time
-  bot.onText(/\/time/, (msg) => {
-    const currentTime = new Date().toLocaleString();
-    bot
-      .sendMessage(msg.chat.id, `🕐 Current server time: ${currentTime}`)
-      .catch((err) => console.error("Error sending time message:", err));
-  });
-
-  // /chatinfo
-  bot.onText(/\/chatinfo/, (msg) => {
-    const chat = msg.chat;
-    let chatInfo = `📊 Chat Information\nChat ID: ${chat.id}\nType: ${chat.type}\n`;
-    if (chat.title) chatInfo += `Title: ${chat.title}\n`;
-    if (chat.username) chatInfo += `Username: @${chat.username}\n`;
-    if (chat.description) chatInfo += `Description: ${chat.description}\n`;
-    chatInfo += `\nUser Information:\nID: ${msg.from.id}\nFirst Name: ${
-      msg.from.first_name || "N/A"
-    }\nLast Name: ${msg.from.last_name || "N/A"}\nUsername: ${
-      msg.from.username ? "@" + msg.from.username : "N/A"
-    }\n`;
-    bot.sendMessage(msg.chat.id, chatInfo).catch((err) => console.error("Error sending chat info:", err));
-  });
-
-  // /config
-  bot.onText(/\/config(?:\s+(.*))?/, (msg, match) => {
-    const chatId = msg.chat.id;
-    const args = match[1] ? match[1].trim().split(" ") : [];
-    if (args.length === 0) {
-      const config = botConfig.getBotInfo();
-      const configMessage = `⚙️ Bot Configuration
-📝 Name: ${config.name}
-📖 Description: ${config.description}
-🔖 Version: ${config.version}
-⏱️ Rate Limit: ${config.rateLimitCooldown}ms
-📏 Max Echo Length: ${config.maxEchoLength} characters
-Enabled Commands: ${config.enabledCommands.join(", ")}
-Use /config help to see available options.`;
-      bot.sendMessage(chatId, configMessage).catch((err) => console.error("Error sending config message:", err));
-    } else if (args[0] === "help") {
-      const helpMessage = `⚙️ Configuration Help
-Available commands:
-• /config - Show current bot configuration
-• /config name <new_name> - Set bot name
-• /config description <new_description> - Set bot description
-• /config help - Show this help`;
-      bot.sendMessage(chatId, helpMessage).catch((err) => console.error("Error sending config help:", err));
-    } else if (args[0] === "name" && args.length > 1) {
-      const newName = args.slice(1).join(" ").trim();
-      if (newName.length > 50) {
-        return bot.sendMessage(chatId, "❌ Bot name is too long. Please use 50 characters or less.");
-      }
-      botConfig.updateName(newName);
-      bot.sendMessage(chatId, `✅ Bot name updated to: "${newName}"`);
-    } else if (args[0] === "description" && args.length > 1) {
-      const newDescription = args.slice(1).join(" ").trim();
-      if (newDescription.length > 200) {
-        return bot.sendMessage(chatId, "❌ Description is too long. Please use 200 characters or less.");
-      }
-      botConfig.updateDescription(newDescription);
-      bot.sendMessage(chatId, `✅ Bot description updated to: "${newDescription}"`);
-    } else {
-      bot.sendMessage(chatId, "❌ Invalid config command. Use /config help to see available options.");
-    }
-  });
-
-  // Initialize music and menu commands
-  setupMusicCommands(bot);
-  setupMenuCommands(bot);
-
-  console.info("Bot commands registered successfully");
 }
 
-module.exports = { setupCommands, dataStore };
+// --- PAGINATION HELPERS ---
+function buildMusicPage(chatId, page = 1) {
+    const songs = playlistService.getDownloadedSongs(chatId) || [];
+    const perPage = 3;
+    const totalPages = Math.max(1, Math.ceil(songs.length / perPage));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+
+    if (!songs.length) {
+        return {
+            text: '<blockquote><b>🎧 ᴍᴇɴᴜ ᴍᴜsɪᴄ</b></blockquote>\n\n<blockquote><b>⚠️ ɴᴏ ᴍᴜsɪᴄ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ</b> ʏᴇᴛ</blockquote>\n\n<blockquote>ɢᴏ ʙᴀᴄᴋ ᴀɴᴅ ᴄʟɪᴄᴋ <b>✨ ɢᴇɴᴇʀᴀᴛᴇ ✨</b></blockquote>',
+            keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] },
+            menuType: 'menu_music'
+        };
+    }
+
+    const start = (currentPage - 1) * perPage;
+    const pageSongs = songs.slice(start, start + perPage);
+
+    const text = '<b>ᴍᴜsɪᴄ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ:</b>\n' +
+        pageSongs.map((s, i) => `${start + i + 1}. ${escapeHTML(s.title)} - ${escapeHTML(s.artist)}`).join('\n') +
+        `\n\n${menus.menu_music.baseText}\n\nᴘᴀɢᴇ ${currentPage}/${totalPages}`;
+
+    // Base keyboard + pagination row
+    const keyboard = JSON.parse(JSON.stringify(menus.menu_music.keyboard));
+    if (totalPages > 1) {
+        const navRow = [];
+        if (currentPage > 1) navRow.push({ text: '◀', callback_data: `menu_music:${currentPage - 1}` });
+        if (currentPage < totalPages) navRow.push({ text: '▶', callback_data: `menu_music:${currentPage + 1}` });
+        keyboard.inline_keyboard.unshift(navRow);
+    }
+
+    return { text, keyboard, menuType: 'menu_music' };
+}
+
+// --- CALLBACK HANDLERS MAP (UPDATED) ---
+const callbackHandlers = {
+    menu_music: (bot, chatId, msg, args) => buildMusicPage(chatId, parseInt(args?.[0]) || 1),
+
+    menu_playlists: () => ({
+        text: '<blockquote><b>📂 ᴘʟᴀʏʟɪsᴛ ᴍᴇɴᴜ </b></blockquote>\n\n<blockquote>ᴜsᴇ /playlist ᴛᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴄᴏʟʟᴇᴄᴛɪᴏɴs!</blockquote>'
+    }),
+
+    menu_utility: () => ({
+        text: '<blockquote><b>🛠 ᴜᴛɪʟɪᴛʏ ᴍᴇɴᴜ</b></blockquote>\n\n<blockquote>ɴᴇᴇᴅ ʙᴏᴛ ɪɴғᴏ ᴏʀ qᴜɪᴄᴋ ᴛᴏᴏʟs?</blockquote>',
+        keyboard: {
+            inline_keyboard: [
+                [{ text: '📜 ʜᴇʟᴘ ɢᴜɪᴅᴇ', callback_data: 'utility_help' }, { text: '⚙️ ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ', callback_data: 'utility_config' }],
+                [{ text: '📊 ᴍᴜsɪᴄ sᴛᴀᴛs', callback_data: 'utility_musicstats' }, { text: '⏱ sᴇʀᴠᴇʀ ᴛɪᴍᴇ', callback_data: 'utility_time' }],
+                [{ text: '🗨 ᴄʜᴀᴛ ɪɴғᴏ', callback_data: 'utility_chatinfo' }, { text: '📶 ᴘɪɴɢ ᴛᴇsᴛ', callback_data: 'utility_ping' }],
+                [{ text: '« ʙᴀᴄᴋ ᴛᴏ sᴇᴛᴛɪɴɢs', callback_data: 'menu_settings' }]
+            ]
+        }
+    }),
+
+    quick_play: () => ({
+        text: '<blockquote><b>🎵 ǫᴜɪᴄᴋ ᴘʟᴀʏ</b></blockquote>\n\n<blockquote>Sᴇɴᴅ ᴀ sᴏɴɢ ɴᴀᴍᴇ ᴏʀ ʏᴏᴜᴛᴜʙᴇ/sᴘᴏᴛɪғʏ ʟɪɴᴋ ᴛᴏ sᴛᴀʀᴛ ᴘʟᴀʏɪɴɢ ɪɴsᴛᴀɴᴛʟʏ!</blockquote>\n<blockquote><b>Exᴀᴍᴘʟᴇ: <code>Bohemian Rhapsody</code></b></blockquote>'
+    }),
+
+    quick_help: () => ({
+        text: botConfig.getHelpMessage ? botConfig.getHelpMessage() : 'ʜᴇʟᴘ ᴍᴇssᴀɢᴇ ɴᴏᴛ ᴄᴏɴғɪɢᴜʀᴇᴅ.'
+    }),
+            
+    menu_main: (bot, chatId, msg) => {
+        const userFirstName = (msg?.from?.first_name) || 'User';
+        const newText = `<blockquote>🎧 ʜᴇʏ <b>${escapeHTML(userFirstName)}</b></blockquote>
+
+<blockquote>🚀 ɪ'ᴍ ʏᴏᴜʀ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ—ʀᴇᴀᴅʏ ᴛᴏ ꜱᴛʀᴇᴀᴍ ᴀɴᴅ ᴅᴏᴡɴʟᴏᴀᴅ ꜱᴏɴɢꜱ ꜰʀᴏᴍ <b>ʏᴏᴜᴛᴜʙᴇ</b> & <b>ꜱᴘᴏᴛɪꜰʏ</b>, ᴡʜᴇᴛʜᴇʀ ʏᴏᴜ'ʀᴇ ᴄʜɪʟʟɪɴɢ ᴀʟᴏɴᴇ ᴏʀ ᴠɪʙɪɴɢ ɪɴ ᴀ ɢʀᴏᴜᴘ</blockquote>
+
+<blockquote>🎶 ᴊᴜꜱᴛ ᴛᴀᴘ ᴍᴇ ᴡʜᴇɴ ʏᴏᴜ ɴᴇᴇᴅ ᴀ ʙᴇᴀᴛ, ᴀ ᴅʀᴏᴘ, ᴏʀ ᴀ ꜱᴏᴜɴᴅᴛʀᴀᴄᴋ ꜰᴏʀ ʏᴏᴜʀ ᴍᴏᴏᴅ</blockquote>
+
+<blockquote>⚙️ ᴡᴀɴɴᴀ ᴋɴᴏᴡ ᴍʏ ꜰᴜʟʟ ᴘᴏᴡᴇʀꜱ? ᴄʟɪᴄᴋ <b>"ꜱᴇᴛᴛɪɴɢꜱ"</b> ʙᴇʟᴏᴡ ᴀɴᴅ ᴅɪꜱᴄᴏᴠᴇʀ ᴛʜᴇ ᴍᴀɢɪᴄ</blockquote>`;
+
+        const welcome = botConfig.getWelcomeMessage
+            ? botConfig.getWelcomeMessage(userFirstName)
+            : null;
+
+        const keyboard = welcome?.keyboard || {
+            inline_keyboard: [
+                [{ text: '⚙️ ꜱᴇᴛᴛɪɴɢꜱ', callback_data: 'menu_settings' }]
+            ]
+        };
+
+        return { text: newText, keyboard };
+    },
+
+    menu_settings: () => ({
+        text: menus.menu_settings.text,
+        keyboard: menus.menu_settings.keyboard,
+        menuType: 'menu_settings'
+    })
+};
+
+// --- CALLBACK HANDLER (UPDATED) ---
+async function handleCallback(bot, chatId, data, msg, messageId = null) {
+    try {
+        const [key, ...args] = data.split(':');
+        const handler = callbackHandlers[key];
+        
+        if (!handler) {
+            return {
+                text: '<blockquote><b>❌ ᴜɴᴋɴᴏᴡɴ ᴀᴄᴛɪᴏɴ. ᴘʟᴇᴀsᴇ ᴜsᴇ ᴛʜᴇ ᴍᴇɴᴜ ʙᴜᴛᴛᴏɴs ᴏʀ ᴛʏᴘᴇ ᴀ ᴄᴏᴍᴍᴀɴᴅ</b></blockquote>',
+                keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] }
+            };
+        }
+        
+        const result = await handler(bot, chatId, msg, args) || {};
+        
+        // If we have a messageId (from callback query), use sendOrEdit with media support
+        if (messageId && result.menuType) {
+            await sendOrEdit(bot, chatId, messageId, result.text, result.keyboard, 'HTML', result.menuType);
+            return null; // Return null to indicate we handled the message editing
+        }
+        
+        return result;
+        
+    } catch (error) {
+        logger.error(`Error in handleCallback (chat: ${chatId}, data: ${data}):`, error);
+        return {
+            text: '❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ. ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ ᴏʀ ᴄᴏɴᴛᴀᴄᴛ sᴜᴘᴘᴏʀᴛ.',
+            keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] }
+        };
+    }
+}
+
+// --- CALLBACK QUERY HANDLER ---
+bot.on('callback_query', async (callbackQuery) => {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const data = callbackQuery.data;
+    
+    try {
+        const result = await handleCallback(bot, chatId, data, callbackQuery, messageId);
+        
+        // If result is not null, we need to send/edit a message
+        if (result) {
+            await sendOrEdit(bot, chatId, messageId, result.text, result.keyboard, 'HTML', result.menuType);
+        }
+        
+        // Answer the callback query to remove the loading state
+        await bot.answerCallbackQuery(callbackQuery.id);
+        
+    } catch (error) {
+        logger.error('Error handling callback query:', error);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Error processing request' });
+    }
+});
+
+// --- COMMAND SETUP ---
+function setupMenuCommands(bot) {
+    // Register commands for text triggers
+    bot.onText(/^\/menu_music$/, async (msg) => {
+        const result = await handleCallback(bot, msg.chat.id, 'menu_music:1', msg);
+        if (result) {
+            await sendOrEdit(bot, msg.chat.id, null, result.text, result.keyboard, 'HTML', result.menuType);
+        }
+    });
+
+    bot.onText(/^\/menu_settings$/, async (msg) => {
+        const result = await handleCallback(bot, msg.chat.id, 'menu_settings', msg);
+        if (result) {
+            await sendOrEdit(bot, msg.chat.id, null, result.text, result.keyboard, 'HTML', result.menuType);
+        }
+    });
+
+    logger.info('Menu commands registered successfully');
+}
+
+module.exports = { setupMenuCommands, handleCallback };
