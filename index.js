@@ -16,7 +16,7 @@ if (!BOT_TOKEN) {
 
 // Bot configuration
 const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
-const WEBHOOK_URL = process.env.WEBHOOK_URL || `https://${process.env.RENDER_APP_NAME || 'your-app-name'}.onrender.com`;
+const WEBHOOK_URL = process.env.WEBHOOK_URL || `https://${process.env.RENDER_APP_NAME || 'stream-beats'}.onrender.com`;
 const PORT = process.env.PORT || 8000;
 
 let bot;
