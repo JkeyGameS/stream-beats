@@ -29,7 +29,7 @@ const menus = {
                 [{ text: '⏭ ɴᴇxᴛ', callback_data: 'music_next' }, { text: '⏮ ᴘʀᴇᴠɪᴏᴜs', callback_data: 'music_previous' }],
                 [{ text: '📂 ᴘʟᴀʏʟɪsᴛs', callback_data: 'menu_playlists' }],
                 [{ text: '🎵 qᴜɪᴄᴋ ᴘʟᴀʏ', callback_data: 'quick_play' }],
-                [{ text: '🔙 ʙᴀᴄᴋ', callback_data: 'menu_main' }]
+                [{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]
             ]
         }
     },
@@ -37,7 +37,7 @@ const menus = {
         text: `<blockquote><b>⚙️ ᴍᴇɴᴜ ꜱᴇᴛᴛɪɴɢꜱ ✦</b></blockquote>
 
 <blockquote>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ʏᴏᴜʀ ᴄᴏɴᴛʀᴏʟ ᴄᴇɴᴛᴇʀ
-ʜᴇʀᴇ ʏᴏᴜ ᴄᴀɴ ᴛᴜɴᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ—ᴀᴄᴄᴇꜱꜱ ʜᴇʟᴘ, ᴜᴛɪʟɪᴛɪᴇꜱ, ᴘʀᴇᴍɪᴜᴍ ᴘʟᴀɴꜱ, ʙᴏᴛ ɪɴꜰᴏ, ᴄʜᴀᴛ ꜱᴇᴛᴛɪɴɢꜱ & ᴍᴏʀᴇ</blockquote>
+ʜᴇʀᴇ ʏᴏᴜ ᴄᴀɴ ᴛᴜɴᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ, ᴀᴄᴄᴇꜱꜱ ʜᴇʟᴘ, ᴜᴛɪʟɪᴛɪᴇꜱ, ᴘʀᴇᴍɪᴜᴍ ᴘʟᴀɴꜱ, ʙᴏᴛ ɪɴꜰᴏ, ᴄʜᴀᴛ ꜱᴇᴛᴛɪɴɢꜱ & ᴍᴏʀᴇ</blockquote>
 
 <blockquote>🔧 ᴄᴜꜱᴛᴏᴍɪᴢᴇ ʏᴏᴜʀ ꜱᴛʏʟᴇ  
 🧠 ᴜɴʟᴏᴄᴋ ᴛᴏᴏʟꜱ  
@@ -48,7 +48,7 @@ const menus = {
                 [{ text: '💳 ᴘʟᴀɴs', callback_data: 'menu_plans' }, { text: 'ℹ️ ʙᴏᴛ ɪɴғᴏ', callback_data: 'menu_info' }],
                 [{ text: '👑 ᴏᴡɴᴇʀ', url: 'https://t.me/Jkey_GameS' }, { text: '💬 ᴄʜᴀᴛ', callback_data: 'menu_chat' }],
                 [{ text: '🌍 ʟᴀɴɢᴜᴀɢᴇ', callback_data: 'menu_language' }, { text: '📊 sᴛᴀᴛs', callback_data: 'menu_stats' }],
-                [{ text: '🔙 ʙᴀᴄᴋ', callback_data: 'menu_main' }]
+                [{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]
             ]
         }
     }
@@ -98,8 +98,8 @@ function buildMusicPage(chatId, page = 1) {
 
     if (!songs.length) {
         return {
-            text: '<blockquote><b>ᴍᴇɴᴜ ᴍᴜsɪᴄ 🎧</b></blockquote>\n\n<blockquote><b>⚠️ ɴᴏ ᴍᴜsɪᴄ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ</b> ʏᴇᴛ</blockquote>\n\n<blockquote>ɢᴏ ʙᴀᴄᴋ ᴀɴᴅ ᴄʟɪᴄᴋ <b>✨ ɢᴇɴᴇʀᴀᴛᴇ ✨</b></blockquote>',
-            keyboard: { inline_keyboard: [[{ text: '🔙 ʙᴀᴄᴋ', callback_data: 'menu_main' }]] }
+            text: '<blockquote><b>🎧 ᴍᴇɴᴜ ᴍᴜsɪᴄ</b></blockquote>\n\n<blockquote><b>⚠️ ɴᴏ ᴍᴜsɪᴄ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ</b> ʏᴇᴛ</blockquote>\n\n<blockquote>ɢᴏ ʙᴀᴄᴋ ᴀɴᴅ ᴄʟɪᴄᴋ <b>✨ ɢᴇɴᴇʀᴀᴛᴇ ✨</b></blockquote>',
+            keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] }
         };
     }
 
@@ -127,23 +127,23 @@ const callbackHandlers = {
     menu_music: (bot, chatId, msg, args) => buildMusicPage(chatId, parseInt(args?.[0]) || 1),
 
     menu_playlists: () => ({
-        text: '📂 ᴘʟᴀʏʟɪsᴛ ᴍᴇɴᴜ\n\nᴜsᴇ /playlist ᴛᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴄᴏʟʟᴇᴄᴛɪᴏɴs!'
+        text: '<blockquote><b>📂 ᴘʟᴀʏʟɪsᴛ ᴍᴇɴᴜ </b></blockquote>\n\n<blockquote>ᴜsᴇ /playlist ᴛᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴄᴏʟʟᴇᴄᴛɪᴏɴs!</blockquote>'
     }),
 
     menu_utility: () => ({
-        text: '🛠 <b>ᴜᴛɪʟɪᴛʏ ᴍᴇɴᴜ</b> 🛠\nɴᴇᴇᴅ ʙᴏᴛ ɪɴғᴏ ᴏʀ qᴜɪᴄᴋ ᴛᴏᴏʟs?',
+        text: '<blockquote><b>🛠 ᴜᴛɪʟɪᴛʏ ᴍᴇɴᴜ</b></blockquote>\n\n<blockquote>ɴᴇᴇᴅ ʙᴏᴛ ɪɴғᴏ ᴏʀ qᴜɪᴄᴋ ᴛᴏᴏʟs?</blockquote>',
         keyboard: {
             inline_keyboard: [
                 [{ text: '📜 ʜᴇʟᴘ ɢᴜɪᴅᴇ', callback_data: 'utility_help' }, { text: '⚙️ ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ', callback_data: 'utility_config' }],
                 [{ text: '📊 ᴍᴜsɪᴄ sᴛᴀᴛs', callback_data: 'utility_musicstats' }, { text: '⏱ sᴇʀᴠᴇʀ ᴛɪᴍᴇ', callback_data: 'utility_time' }],
                 [{ text: '🗨 ᴄʜᴀᴛ ɪɴғᴏ', callback_data: 'utility_chatinfo' }, { text: '📶 ᴘɪɴɢ ᴛᴇsᴛ', callback_data: 'utility_ping' }],
-                [{ text: '🔙 ʙᴀᴄᴋ ᴛᴏ sᴇᴛᴛɪɴɢs', callback_data: 'menu_settings' }]
+                [{ text: '« ʙᴀᴄᴋ ᴛᴏ sᴇᴛᴛɪɴɢs', callback_data: 'menu_settings' }]
             ]
         }
     }),
 
     quick_play: () => ({
-        text: '🎵 <b>qᴜɪᴄᴋ ᴘʟᴀʏ</b>\nSᴇɴᴅ ᴀ sᴏɴɢ ɴᴀᴍᴇ ᴏʀ ʏᴏᴜᴛᴜʙᴇ/sᴘᴏᴛɪғʏ ʟɪɴᴋ ᴛᴏ sᴛᴀʀᴛ ᴘʟᴀʏɪɴɢ ɪɴsᴛᴀɴᴛʟʏ!\nExᴀᴍᴘʟᴇ: <code>Bohemian Rhapsody</code>'
+        text: '<blockquote><b>🎵 ǫᴜɪᴄᴋ ᴘʟᴀʏ</b></blockquote>\n\n<blockquote>Sᴇɴᴅ ᴀ sᴏɴɢ ɴᴀᴍᴇ ᴏʀ ʏᴏᴜᴛᴜʙᴇ/sᴘᴏᴛɪғʏ ʟɪɴᴋ ᴛᴏ sᴛᴀʀᴛ ᴘʟᴀʏɪɴɢ ɪɴsᴛᴀɴᴛʟʏ!</blockquote>\n<blockquote><b>Exᴀᴍᴘʟᴇ: <code>Bohemian Rhapsody</code></b></blockquote>'
     }),
 
     quick_help: () => ({
@@ -189,8 +189,8 @@ async function handleCallback(bot, chatId, data, msg) {
         const handler = callbackHandlers[key];
         if (!handler) {
             return {
-                text: '❌ ᴜɴᴋɴᴏᴡɴ ᴀᴄᴛɪᴏɴ. ᴘʟᴇᴀsᴇ ᴜsᴇ ᴛʜᴇ ᴍᴇɴᴜ ʙᴜᴛᴛᴏɴs ᴏʀ ᴛʏᴘᴇ ᴀ ᴄᴏᴍᴍᴀɴᴅ.',
-                keyboard: { inline_keyboard: [[{ text: '🔙 ʙᴀᴄᴋ', callback_data: 'menu_main' }]] }
+                text: '<blockquote><b>❌ ᴜɴᴋɴᴏᴡɴ ᴀᴄᴛɪᴏɴ. ᴘʟᴇᴀsᴇ ᴜsᴇ ᴛʜᴇ ᴍᴇɴᴜ ʙᴜᴛᴛᴏɴs ᴏʀ ᴛʏᴘᴇ ᴀ ᴄᴏᴍᴍᴀɴᴅ</b></blockquote>',
+                keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] }
             };
         }
         const result = await handler(bot, chatId, msg, args) || {};
@@ -199,7 +199,7 @@ async function handleCallback(bot, chatId, data, msg) {
         logger.error(`Error in handleCallback (chat: ${chatId}, data: ${data}):`, error);
         return {
             text: '❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ. ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ ᴏʀ ᴄᴏɴᴛᴀᴄᴛ sᴜᴘᴘᴏʀᴛ.',
-            keyboard: { inline_keyboard: [[{ text: '🔙 ʙᴀᴄᴋ', callback_data: 'menu_main' }]] }
+            keyboard: { inline_keyboard: [[{ text: '« ʙᴀᴄᴋ »', callback_data: 'menu_main' }]] }
         };
     }
 }
